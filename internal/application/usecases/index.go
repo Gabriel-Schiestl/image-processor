@@ -1,27 +1,43 @@
 package usecases
 
 import (
-	"errors"
-	"mime/multipart"
-	"path/filepath"
+	"bytes"
+	"encoding/json"
+	"image"
+
+	"github.com/Gabriel-Schiestl/image-processor/internal/domain/models"
+	"github.com/nfnt/resize"
 )
 
 var extensionsAllowed = map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".bmp": true, ".webp": true}
 
 type ProcessImageUseCase struct {
-	imagesCh chan<- *multipart.FileHeader
+	imagesCh chan<- image.Image
 }
 
-func NewProcessImageUseCase(ch chan<- *multipart.FileHeader) *ProcessImageUseCase {
+func NewProcessImageUseCase(ch chan<- image.Image) *ProcessImageUseCase {
 	return &ProcessImageUseCase{imagesCh: ch}
 }
 
-func (uc *ProcessImageUseCase) Execute(file *multipart.FileHeader) error {
-	if ext := filepath.Ext(file.Filename); !extensionsAllowed[ext] {
-		return errors.New("not allowed extension")
+func (uc *ProcessImageUseCase) Execute(msg []byte) {
+	model := &models.Message{}
+
+	if err := json.Unmarshal(msg, &model); err != nil {
+		return
 	}
 
-	uc.imagesCh <- file
+	reader := bytes.NewReader(model.ImgBuffer)
 
-	return nil
+	img, str, err := image.Decode(reader)
+	if err != nil {
+		return
+	}
+
+	if _, ok := extensionsAllowed[str]; !ok {
+		return
+	}
+
+	img = resize.Resize(224, 224, img, resize.Lanczos3)
+
+	uc.imagesCh <- img
 }

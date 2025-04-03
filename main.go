@@ -1,29 +1,38 @@
 package main
 
 import (
-	"mime/multipart"
+	"image"
 
-	"github.com/Gabriel-Schiestl/image-processor/internal/application/usecases"
 	"github.com/Gabriel-Schiestl/image-processor/internal/consumer"
-	"github.com/Gabriel-Schiestl/image-processor/internal/controllers"
-	"github.com/gin-gonic/gin"
+	"github.com/Gabriel-Schiestl/image-processor/internal/domain/models"
 )
 
 var workers = 3
 
 func main() {
-	server := gin.Default()
+	// server := gin.Default()
+	imgCh := make(chan image.Image, 10)
 
-	imgCh := make(chan *multipart.FileHeader, 10)
+	// controller := controllers.NewController(server)
+	// processImgUseCase := usecases.NewProcessImageUseCase(imgCh)
+	// imgController := controllers.NewImageController(controller, processImgUseCase)
+	// imgController.RegisterRoutes()
+	rabbitmq := models.NewRabbitMQ("images")
+	defer rabbitmq.Close()
 
-	controller := controllers.NewController(server)
-	processImgUseCase := usecases.NewProcessImageUseCase(imgCh)
-	imgController := controllers.NewImageController(controller, processImgUseCase)
-	imgController.RegisterRoutes()
-
-	for i := range workers {
-		go consumer.Consume(i + 1, imgCh)
+	msgs, err := rabbitmq.Consume()
+	if err != nil {
+		panic(err)
 	}
 
-	server.Run(":8080")
+	for i := range workers {
+		go consumer.Consume(i + 1, msgs, imgCh)
+	}
+
+	for img := range imgCh {
+		// Process the image here
+		// For example, save it to disk or send it to another service
+	}
+
+	// server.Run(":8080")
 }

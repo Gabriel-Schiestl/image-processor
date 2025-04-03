@@ -1,12 +1,18 @@
 package consumer
 
 import (
-	"fmt"
-	"mime/multipart"
+	"image"
+
+	"github.com/Gabriel-Schiestl/image-processor/internal/application/usecases"
+	"github.com/rabbitmq/amqp091-go"
 )
 
-func Consume(workerId int, ch <-chan *multipart.FileHeader) {
+func Consume(workerId int, ch <-chan amqp091.Delivery, imgCh chan<- image.Image) {
+	useCase := usecases.NewProcessImageUseCase(imgCh)
+
 	for img := range ch {
-		fmt.Println(img)
+		go func(img amqp091.Delivery) {
+			useCase.Execute(img.Body)
+		}(img)
 	}
 }
