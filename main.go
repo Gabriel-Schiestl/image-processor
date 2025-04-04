@@ -61,6 +61,7 @@ func main() {
 	}
 
 	for img := range imgCh {
+		fmt.Println("Saving image:", img.Prediction)
 		repo.Save(img)
 	}
 
